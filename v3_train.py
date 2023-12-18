@@ -5,12 +5,12 @@ import torch
 import torch.utils.data as data
 from lightning.pytorch.callbacks import ModelCheckpoint, RichProgressBar
 from loguru import logger
+from pytorch_lightning.loggers import NeptuneLogger
 from torch.utils.data import DataLoader
 from transformers import logging
 
 from datasets.final_dataset import ELDataset
 from model.v3_model import BertELModelV3
-from pytorch_lightning.loggers import NeptuneLogger
 
 if __name__ == "__main__":
     logging.set_verbosity_error()

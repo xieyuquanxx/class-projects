@@ -99,21 +99,16 @@ if __name__ == "__main__":
             texta = test["text"].replace(mm, "#" + mm + "#", 1)
             nil_type = model.get_type([texta])
             chi = ID2CHI[nil_type.item()]  # type: ignore
-            # texta += " #" + mm + "#的类型是" + chi
             if mm in mention2id:
                 kb_ids = mention2id[mm]
                 matches = []
-                matches2 = []
                 for kb_id in kb_ids:
                     textb = kbsum[kb_id]
                     match = model.predict(
                         [texta], [textb], ["#" + mm + "#的类型是" + chi]
                     )
                     matches.append(match.item())
-                    # matches2.append(model.predict([texta], [textb]).item())
-                # print(kb_ids)
-                # print(matches)
-                # matches = [max(matches[i], matches[i]) for i in range(len(matches))]
+
                 ma = np.argmax(matches)
                 if (
                     matches[ma] >= args.threshold

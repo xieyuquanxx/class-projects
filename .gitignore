@@ -1,3 +1,4 @@
+__pycache__
 ernie-3.0-base-zh
 check_points/
 bert-base-chinese
@@ -5,4 +6,5 @@ chinese-roberta-wwm-ext
 ckpt/
 *.json
 *.txt
+!requirements.txt
 .neptune

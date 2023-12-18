@@ -40,7 +40,7 @@ class BertELModelV2(L.LightningModule):
         self.lr = lr
         self.weight_decay = weight_decay
         self.batch_size = batch_size
-        self.version = "v3"
+        self.version = "v2"
 
         self.save_hyperparameters()
 
