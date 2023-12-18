@@ -2,8 +2,8 @@
 
 ## quick start
 ```
-conda create -n el-nlp python=3.9
-conda activate el-nlp
+conda create -n el_nlp python=3.9
+conda activate el_nlp
 conda install pytorch==1.12.1 torchvision==0.13.1 torchaudio==0.12.1 cudatoolkit=11.3 -c pytorch -y
 conda install lightning -c conda-forge
 
@@ -17,7 +17,7 @@ pip install .
 - ernie-3.0-base-zh
 
 ## 训练数据
-之后放在谷歌网盘上，下载后放在`data/`下。
+之后放在谷歌网盘上，下载后放在`data/`下。[链接](https://drive.google.com/file/d/14cJRB0t2T9Jk6bmuJoyaLMtORwffIGMh/view?usp=drive_link)
 
 ## 模型
 在`model/`目录下，现在放了3个实现，`v2_bert_model.py`的模型架构于baseline基本一样，`v3_model.py`实现了更深的网络结果。

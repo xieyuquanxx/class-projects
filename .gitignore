@@ -8,3 +8,4 @@ ckpt/
 *.txt
 !requirements.txt
 .neptune
+*.zip
