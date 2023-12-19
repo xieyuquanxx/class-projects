@@ -8,12 +8,14 @@ from transformers import BertTokenizer
 
 
 class ELDataset(Dataset):
-    def __init__(self, mode="train", max_length=128) -> None:
+    def __init__(
+        self, mode="train", max_length=128, model_name="bert-base-chinese"
+    ) -> None:
         super().__init__()
         self.mode = mode
         self.max_length = max_length
 
-        self.tokenizer = BertTokenizer.from_pretrained("bert-base-chinese")
+        self.tokenizer = BertTokenizer.from_pretrained(model_name)
         self.data = self._load_data()
 
     def _load_data(self):

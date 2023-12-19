@@ -1,11 +1,38 @@
+import math
+
 import lightning as L
 import torch
 import torch.nn.functional as F
 from torch import nn, optim
+from torch.autograd import Variable
 from transformers import BertModel, BertTokenizer, ErnieModel
 
 
-class BertELModelV3(L.LightningModule):
+class PositionalEncoding(nn.Module):
+    "Implement the PE function."
+
+    def __init__(self, d_model, dropout, max_len=128):
+        super(PositionalEncoding, self).__init__()
+        self.dropout = nn.Dropout(p=dropout)
+
+        # Compute the positional encodings once in log space.
+        pe = torch.zeros(max_len, d_model)  # [128,768]
+        position = torch.arange(0, max_len).unsqueeze(1)  # [128,1]
+        div_term = torch.exp(
+            torch.arange(0, d_model, 2) * -(math.log(10000.0) / d_model)
+        )
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        pe = pe.unsqueeze(0)
+        self.pe = pe
+        self.register_buffer("pe", pe)
+
+    def forward(self, x, idx):
+        x = x + Variable(self.pe[idx, : x.size(1)], requires_grad=False)
+        return self.dropout(x)
+
+
+class BertELModelV4(L.LightningModule):
     def __init__(
         self,
         model_name="bert-base-chinese",
@@ -13,9 +40,9 @@ class BertELModelV3(L.LightningModule):
         batch_size=256,
         temperature=0.1,
         lr=5e-5,
-        weight_decay=1e-7,
+        weight_decay=0,
     ):
-        super(BertELModelV3, self).__init__()
+        super(BertELModelV4, self).__init__()
         # bert模型
         if "ernie" in model_name:
             self.bert = ErnieModel.from_pretrained("ernie-3.0-base-zh")
@@ -25,25 +52,17 @@ class BertELModelV3(L.LightningModule):
         # 定义bert后面要接的网络
 
         self.sentence_net = nn.Sequential(
-            nn.Linear(768 * 3, 128),
-            nn.LeakyReLU(),
-            # nn.Dropout(0.1),
-            nn.Linear(128, 64),
-            nn.LeakyReLU(),
-            nn.Linear(64, 1),
+            nn.Linear(768 * 3, 1024),
+            nn.ReLU(),
+            nn.Linear(1024, 1),
         )
 
         self.nil_type_net = nn.Sequential(
-            nn.Linear(768 * 3, 512),
-            nn.LeakyReLU(),
-            nn.Linear(512, 256),
-            nn.LeakyReLU(),
-            # nn.Dropout(0.2),
-            nn.Linear(256, 128),
-            nn.LeakyReLU(),
-            # nn.Dropout(0.2),
-            nn.Linear(128, 64),
-            nn.LeakyReLU(),
+            nn.Linear(768 * 3, 1024),
+            nn.ReLU(),
+            nn.Dropout(0.2),
+            nn.Linear(1024, 64),
+            nn.ReLU(),
             nn.Linear(64, 24),
         )
 
@@ -52,8 +71,11 @@ class BertELModelV3(L.LightningModule):
         self.lr = lr
         self.weight_decay = weight_decay
         self.batch_size = batch_size
-        self.version = "v3, more deep network"
+        self.version = "v4, keep it simple"
 
+        self.pe_encoding = PositionalEncoding(
+            d_model=768, dropout=0.1, max_len=self.max_length
+        )
         self.init_weight()
 
         self.save_hyperparameters()
@@ -66,9 +88,10 @@ class BertELModelV3(L.LightningModule):
         If a module is a linear layer, it initializes the weight with a normal distribution (mean=0, std=0.02)
         and sets the bias to a constant value of 0.
         """
+        # return
         for m in self.modules():
             if isinstance(m, nn.Linear):
-                nn.init.normal_(m.weight.data, 0, 1)
+                nn.init.normal_(m.weight.data, 0, 0.02)
                 nn.init.constant_(m.bias, 0)
 
     def configure_optimizers(self):
@@ -83,7 +106,7 @@ class BertELModelV3(L.LightningModule):
 
         loss1 = F.binary_cross_entropy(x_match, y_match.to(torch.float32))
         loss2 = F.cross_entropy(x_type / self.temperature, y_type)
-        # Logging to TensorBoard (if installed) by default
+
         loss = loss1 + loss2
         self.log("train/match_loss", loss1)
         self.log("train/type_loss", loss2)
@@ -111,8 +134,10 @@ class BertELModelV3(L.LightningModule):
         for bs in range(0, self.batch_size):
             if bs >= len(loc[0]) or bs >= len(loc[1]):
                 break
-            tt1 = last_hidden_state[bs, loc[0][bs], :]
+            tt1 = last_hidden_state[bs, loc[0][bs], :]  # [1, 768]
+            tt1 = tt1 + self.pe_encoding(tt1, loc[0][bs])
             tt2 = last_hidden_state[bs, loc[1][bs], :]
+            tt2 = tt2 + self.pe_encoding(tt2, loc[1][bs])
             t = torch.cat([tt1, tt2], dim=0)
             # print(t.shape)
             all_tokens.append(t)
@@ -136,10 +161,7 @@ class BertELModelV3(L.LightningModule):
 
         match_tensor = torch.sigmoid(match_tensor)
         match_tensor = match_tensor.squeeze(dim=1)
-        # print(out_match, out_match.shape)
-        # out_type = F.softmax(type_tensor, dim=1)  # [batch_size,24]
-        # 这里不能softmax，因为F.cross_entropy已经包含了softmax
-        # out_type = type_tensor / self.temperature
+
         return match_tensor, type_tensor
 
     def eval_get_clstoken(self, texta, textb, textc=[]):

@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 from transformers import logging
 
 from datasets.final_dataset import ELDataset
-from model.v3_model import BertELModelV3
+from model.v4_model import BertELModelV4
 
 if __name__ == "__main__":
     logging.set_verbosity_error()
@@ -22,14 +22,14 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--batch_size", type=int, default=256)
     parser.add_argument("--max_length", type=int, default=128)
-    parser.add_argument("--lr", type=float, default=1e-4)
+    parser.add_argument("--lr", type=float, default=5e-5)
     parser.add_argument("--num_workers", type=int, default=103)
     parser.add_argument("--epochs", type=int, default=7)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument(
         "--model_name",
         type=str,
-        default="ernie-3.0-base-zh",
+        default="bert-base-chinese",
         choices=["chinese-roberta-wwm-ext", "bert-base-chinese", "ernie-3.0-base-zh"],
     )
 
@@ -40,27 +40,13 @@ if __name__ == "__main__":
     train_dataset = ELDataset(
         "train", max_length=args.max_length, model_name=args.model_name
     )
-    # train_set_size = int(len(train_dataset) * 0.8)
-    # valid_set_size = len(train_dataset) - train_set_size
-
-    # # split the train set into two
-    # train_set, valid_set = data.random_split(
-    #     train_dataset,
-    #     [train_set_size, valid_set_size],
-    #     generator=torch.Generator().manual_seed(args.seed),
-    # )
     train_loader = DataLoader(
         train_dataset,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
     )
-    # val_loader = DataLoader(
-    #     valid_set,
-    #     batch_size=args.batch_size,
-    #     num_workers=args.num_workers,
-    # )
 
-    model = BertELModelV3(
+    model = BertELModelV4(
         model_name=args.model_name,
         max_length=args.max_length,
         batch_size=args.batch_size,
@@ -74,7 +60,6 @@ if __name__ == "__main__":
     logger.info("Load Model... Start Training...")
     trainer = L.Trainer(
         limit_train_batches=0.9,
-        # val_check_interval=500,
         max_epochs=args.epochs,
         accelerator="auto",
         devices="auto",
@@ -82,11 +67,11 @@ if __name__ == "__main__":
         logger=neptune_logger,  # type: ignore
         callbacks=[
             ModelCheckpoint(
-                dirpath="check_points/ernie",
+                dirpath="check_points/bertv4",
                 save_top_k=-1,
                 every_n_epochs=1,
                 monitor="train/loss",
-                filename="ernie{epoch}",
+                filename="bertv4{epoch}",
             ),
             RichProgressBar(),
         ],
@@ -96,6 +81,4 @@ if __name__ == "__main__":
     trainer.fit(
         model=model,
         train_dataloaders=train_loader,
-        # val_dataloaders=val_loader,
-        # ckpt_path="/shao_rui/xyq/nlp_el/demos/check_points/new-net-roberta/roberta-wwm-epoch=5.ckpt",
     )
