@@ -2,11 +2,8 @@ from argparse import ArgumentParser
 
 import lightning as L
 
-# import torch
-# import torch.utils.data as data
 from lightning.pytorch.callbacks import ModelCheckpoint, RichProgressBar
 from loguru import logger
-from pytorch_lightning.loggers import NeptuneLogger
 from torch.utils.data import DataLoader
 from transformers import logging
 
@@ -15,14 +12,11 @@ from model.v4_model import BertELModelV4
 
 if __name__ == "__main__":
     logging.set_verbosity_error()
-    # 要用wandb,需要挂梯子
-    # os.environ["http_proxy"] = "http://127.0.0.1:7890"
-    # os.environ["https_proxy"] = "http://127.0.0.1:7890"
 
     parser = ArgumentParser()
     parser.add_argument("--batch_size", type=int, default=256)
     parser.add_argument("--max_length", type=int, default=128)
-    parser.add_argument("--lr", type=float, default=5e-5)
+    parser.add_argument("--lr", type=float, default=1e-5)
     parser.add_argument("--num_workers", type=int, default=103)
     parser.add_argument("--epochs", type=int, default=7)
     parser.add_argument("--seed", type=int, default=42)
@@ -30,7 +24,7 @@ if __name__ == "__main__":
         "--model_name",
         type=str,
         default="bert-base-chinese",
-        choices=["chinese-roberta-wwm-ext", "bert-base-chinese", "ernie-3.0-base-zh"],
+        choices=["chinese-roberta-wwm-ext", "bert-base-chinese"],
     )
 
     args = parser.parse_args()
@@ -53,18 +47,14 @@ if __name__ == "__main__":
         lr=args.lr,
         weight_decay=0,
     )
-    neptune_logger = NeptuneLogger(
-        api_key="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiJmZjA5MmE1My05NDUxLTQ4YWItOGRlOS1lY2E1MzRmMjY1MmUifQ==",
-        project="xieyuquanxx/NLP-EL",
-    )
+
     logger.info("Load Model... Start Training...")
     trainer = L.Trainer(
         limit_train_batches=0.9,
         max_epochs=args.epochs,
         accelerator="auto",
         devices="auto",
-        default_root_dir=f"logs/{args.model_name}",
-        logger=neptune_logger,  # type: ignore
+        default_root_dir=f"{args.model_name}",
         callbacks=[
             ModelCheckpoint(
                 dirpath="check_points/bertv4",
@@ -76,7 +66,6 @@ if __name__ == "__main__":
             RichProgressBar(),
         ],
     )
-    neptune_logger.log_model_summary(model=model, max_depth=-1)  # type: ignore
 
     trainer.fit(
         model=model,

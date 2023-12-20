@@ -5,7 +5,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn, optim
 from torch.autograd import Variable
-from transformers import BertModel, BertTokenizer, ErnieModel
+from transformers import BertModel, BertTokenizer
 
 
 class PositionalEncoding(nn.Module):
@@ -23,12 +23,11 @@ class PositionalEncoding(nn.Module):
         )
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term)
-        pe = pe.unsqueeze(0)
+        pe = pe.unsqueeze(0)  # [1,128,768]
         self.pe = pe
-        self.register_buffer("pe", pe)
 
     def forward(self, x, idx):
-        x = x + Variable(self.pe[idx, : x.size(1)], requires_grad=False)
+        x = x + Variable(self.pe[:, idx, :], requires_grad=False).to("cuda")
         return self.dropout(x)
 
 
@@ -43,13 +42,9 @@ class BertELModelV4(L.LightningModule):
         weight_decay=0,
     ):
         super(BertELModelV4, self).__init__()
-        # bert模型
-        if "ernie" in model_name:
-            self.bert = ErnieModel.from_pretrained("ernie-3.0-base-zh")
-        else:
-            self.bert = BertModel.from_pretrained(model_name)
+
+        self.bert = BertModel.from_pretrained(model_name)
         self.tokenizer = BertTokenizer.from_pretrained(model_name)
-        # 定义bert后面要接的网络
 
         self.sentence_net = nn.Sequential(
             nn.Linear(768 * 3, 1024),
@@ -71,7 +66,7 @@ class BertELModelV4(L.LightningModule):
         self.lr = lr
         self.weight_decay = weight_decay
         self.batch_size = batch_size
-        self.version = "v4, keep it simple"
+        self.version = "use bert-base-chinese model, two simple MLP networks"
 
         self.pe_encoding = PositionalEncoding(
             d_model=768, dropout=0.1, max_len=self.max_length
@@ -88,7 +83,6 @@ class BertELModelV4(L.LightningModule):
         If a module is a linear layer, it initializes the weight with a normal distribution (mean=0, std=0.02)
         and sets the bias to a constant value of 0.
         """
-        # return
         for m in self.modules():
             if isinstance(m, nn.Linear):
                 nn.init.normal_(m.weight.data, 0, 0.02)
@@ -134,22 +128,17 @@ class BertELModelV4(L.LightningModule):
         for bs in range(0, self.batch_size):
             if bs >= len(loc[0]) or bs >= len(loc[1]):
                 break
-            tt1 = last_hidden_state[bs, loc[0][bs], :]  # [1, 768]
-            tt1 = tt1 + self.pe_encoding(tt1, loc[0][bs])
+            tt1 = last_hidden_state[bs, loc[0][bs], :]  # [768]
+            tt1 = self.pe_encoding(tt1, loc[0][bs]).squeeze(dim=0)  # [768]
+
             tt2 = last_hidden_state[bs, loc[1][bs], :]
-            tt2 = tt2 + self.pe_encoding(tt2, loc[1][bs])
-            t = torch.cat([tt1, tt2], dim=0)
-            # print(t.shape)
+            tt2 = self.pe_encoding(tt2, loc[1][bs]).squeeze(dim=0)  # [768]
+
+            t = torch.cat([tt1, tt2], dim=0)  # [1, 768]
             all_tokens.append(t)
-            # break
-        # t1 = last_hidden_state[:, loc[0], :]  # [batch_size, 768]
-        # t2 = last_hidden_state[:, loc[1], :]  # [batch_size, 768]
-        # print(loc)
-        all_tokens = torch.stack(tuple(all_tokens), dim=0)
-        # print(all_tokens.shape)  # [batch_size, 768*2]
+        all_tokens = torch.stack(tuple(all_tokens), dim=0)  # [batch_size, 768*2]
         cls_token = outputs.pooler_output  # [batch_size, 768]
         t = torch.cat([cls_token, all_tokens], dim=1)  # [batch_size, 768*3]
-        # print(t.shape)
         return t
 
     def forward(self, input_ids, attention_masks, loc):
