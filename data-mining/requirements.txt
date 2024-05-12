@@ -1,0 +1,6 @@
+hydra-core==1.3
+lightning
+pandas
+wandb
+rich
+torchmetrics

@@ -1,0 +1,32 @@
+defaults:
+  - _self_
+
+
+
+model:
+  name: test1
+
+  in_features: 27
+  num_classes: 7
+
+  lr: 0.01
+  momentum: 0.9
+  weight_decay: 1e-4
+
+  ckpt: /data/Users/xyq/developer/data-mining/outputs/2024Spring-data-minnig/h9mriuhu/checkpoints/epoch=49-step=6050.ckpt
+
+
+data:
+  path: data
+  batch_size: 64
+
+
+trainer:
+  gpus: [0]
+  seed: 624
+  max_epochs: 100
+  min_epochs: 50
+
+hydra:
+  run:
+    dir: ./outputs/${now:%Y-%m-%d}/${now:%H-%M}

@@ -1,0 +1,6 @@
+__pycache__
+
+lightning_logs/
+outputs/
+
+*.csv
